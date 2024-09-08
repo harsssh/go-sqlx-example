@@ -159,21 +159,45 @@ func SelectUserPosts(db *sqlx.DB) {
 		log.Fatalln(err)
 	}
 
-	grouped := lo.GroupBy(flatResult, func(v T) int {
-		return v.UserID
-	})
+	// きっちり整形する場合
+	{
+		grouped := lo.GroupBy(flatResult, func(v T) int {
+			return v.UserID
+		})
+		result := lo.MapValues(grouped, func(value []T, key int) []Post {
+			return lo.FilterMap(value, func(v T, _ int) (Post, bool) {
+				if !v.PostID.Valid {
+					return Post{}, false
+				}
+				return Post{
+					ID:      v.PostID.V,
+					UserID:  v.UserID,
+					Content: v.Content.V,
+				}, true
+			})
+		})
+		log.Println("User posts:", result)
+	}
 
-	result := lo.MapValues(grouped, func(value []T, key int) []Post {
-		return lo.FilterMap(value, func(v T, _ int) (Post, bool) {
-			if !v.PostID.Valid {
+	// 別の方法
+	{
+		// 先に filter map
+		// INNER JOIN した場合と同じになる
+		// 消えたキーに関する情報 (User) は元データを参照すればいい
+		mapped := lo.FilterMap(flatResult, func(item T, _ int) (Post, bool) {
+			if !item.PostID.Valid {
 				return Post{}, false
 			}
 			return Post{
-				ID:      v.PostID.V,
-				UserID:  v.UserID,
-				Content: v.Content.V,
+				ID:      item.PostID.V,
+				UserID:  item.UserID,
+				Content: item.Content.V,
 			}, true
 		})
-	})
-	log.Println("User posts:", result)
+		// 存在しないキー = []
+		result := lo.GroupBy(mapped, func(p Post) int {
+			return p.UserID
+		})
+		log.Println("User posts:", result)
+	}
 }
