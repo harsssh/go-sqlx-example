@@ -99,6 +99,7 @@ func SelectUsers(db *sqlx.DB) {
 		log.Fatalln(err)
 	}
 
+	// [{1 Alice} {2 Bob} {3 Charlie}]
 	log.Println("All users:", users)
 }
 
@@ -112,6 +113,7 @@ func InQuery(db *sqlx.DB) {
 		log.Fatalln(err)
 	}
 
+	// [{1 Alice} {2 Bob}]
 	log.Println("Selected users:", users)
 }
 
@@ -139,6 +141,7 @@ func JoinQuery(db *sqlx.DB) {
 		log.Fatalln(err)
 	}
 
+	// [{{1 Alice} {1 1 Hello, Alice}} {{1 Alice} {2 1 Nice to meet you}} {{2 Bob} {3 2 Hello, Bob}}]
 	log.Println("Joined result:", result)
 }
 
@@ -176,6 +179,7 @@ func SelectUserPosts(db *sqlx.DB) {
 				}, true
 			})
 		})
+		// map[1:[{1 1 Hello, Alice} {2 1 Nice to meet you}] 2:[{3 2 Hello, Bob}] 3:[]]
 		log.Println("User posts:", result)
 	}
 
@@ -194,10 +198,11 @@ func SelectUserPosts(db *sqlx.DB) {
 				Content: item.Content.V,
 			}, true
 		})
-		// 存在しないキー = []
+		// 存在しないキーは [] として扱えばいい
 		result := lo.GroupBy(mapped, func(p Post) int {
 			return p.UserID
 		})
+		// map[1:[{1 1 Hello, Alice} {2 1 Nice to meet you}] 2:[{3 2 Hello, Bob}]]
 		log.Println("User posts:", result)
 	}
 }
