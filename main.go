@@ -1,10 +1,12 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/samber/lo"
 )
 
 // camel case でないならタグは不要
@@ -27,6 +29,7 @@ func main() {
 	SelectUsers(db)
 	InQuery(db)
 	JoinQuery(db)
+	SelectUserPosts(db)
 }
 
 func InitDB() *sqlx.DB {
@@ -137,4 +140,40 @@ func JoinQuery(db *sqlx.DB) {
 	}
 
 	log.Println("Joined result:", result)
+}
+
+func SelectUserPosts(db *sqlx.DB) {
+	// 素の JOIN された状態で取得
+	type T struct {
+		UserID  int           `db:"user_id"`
+		PostID  sql.Null[int] `db:"post_id"`
+		Content sql.Null[string]
+	}
+	query := `
+		SELECT users.id AS user_id, posts.id AS post_id, posts.content
+		FROM users
+		LEFT JOIN posts ON users.id = posts.user_id
+	`
+	var flatResult []T
+	if err := db.Select(&flatResult, query); err != nil {
+		log.Fatalln(err)
+	}
+
+	grouped := lo.GroupBy(flatResult, func(v T) int {
+		return v.UserID
+	})
+
+	result := lo.MapValues(grouped, func(value []T, key int) []Post {
+		return lo.FilterMap(value, func(v T, _ int) (Post, bool) {
+			if !v.PostID.Valid {
+				return Post{}, false
+			}
+			return Post{
+				ID:      v.PostID.V,
+				UserID:  v.UserID,
+				Content: v.Content.V,
+			}, true
+		})
+	})
+	log.Println("User posts:", result)
 }
